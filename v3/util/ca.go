@@ -70,20 +70,21 @@ func IsServerAuthCert(cert *x509.Certificate) bool {
 }
 
 // IsEmailProtectionCert returns true if the certificate presented is for use protecting emails.
-// The S/MIME BRs say the certificate can be identified by an EKU for id-kp-emailProtection
-// and the inclusion of a rfc822Name SAN or an otherName of type id-on-SmtpUTF8Mailbox.
+// Return true if it has an EKU for id-kp-emailProtection or if it has one of the policy OIDs.
 // As a way of being overly cautious and choosing to prefer false positives over false negatives,
-// also include certificates that have no EKUs, the any purpose EKU, or one of the policy OIDs.
+// also return true if it has no EKUs or the any purpose EKU and includes a rfc822Name or an
+// otherName of type id-on-SmtpUTF8Mailbox in the subjectAltName extension.
 func IsEmailProtectionCert(cert *x509.Certificate) bool {
-	if HasEmailSAN(cert) {
-		if len(cert.ExtKeyUsage) == 0 && len(cert.UnknownExtKeyUsage) == 0 {
+	for _, eku := range cert.ExtKeyUsage {
+		if eku == x509.ExtKeyUsageEmailProtection {
 			return true
 		}
-		for _, eku := range cert.ExtKeyUsage {
-			if eku == x509.ExtKeyUsageAny || eku == x509.ExtKeyUsageEmailProtection {
-				return true
-			}
+		if eku == x509.ExtKeyUsageAny && HasEmailSAN(cert) {
+			return true
 		}
+	}
+	if len(cert.ExtKeyUsage) == 0 && len(cert.UnknownExtKeyUsage) == 0 && HasEmailSAN(cert) {
+		return true
 	}
 	return IsSMIMEBRCertificate(cert)
 }
